@@ -1,21 +1,32 @@
-const express = require('express');
-const userController = require('./../controllers/userController');
-const authController = require('./../controllers/authController');
+const express = require("express");
+const userController = require("./../controllers/userController");
+const authController = require("./../controllers/authController");
 
 const router = express.Router(); // Middleware - check online
 
-router.post('/signup', authController.signup);
-router.post('/login', authController.login);
+// authController.protect - makes the route only work for logged in users
 
-router.post('/forgotPassword', authController.forgotPassword);
-router.patch('/resetPassword/:token', authController.resetPassword);
+router.post("/signup", authController.signup);
+router.post("/login", authController.login);
+
+router.post("/forgotPassword", authController.forgotPassword);
+router.patch("/resetPassword/:token", authController.resetPassword);
+
+router.patch("/updateMe", authController.protect, userController.updateMe);
+router.delete("/deleteMe", authController.protect, userController.deleteMe);
+
+router.patch(
+  "/updateMyPassword",
+  authController.protect,
+  authController.updatePassword
+);
 
 router
-  .route('/')
+  .route("/")
   .get(userController.getAllUsers)
   .post(userController.createUser);
 router
-  .route('/:id')
+  .route("/:id")
   .get(userController.getUser)
   .patch(userController.updateUser)
   .delete(userController.deleteUser);
