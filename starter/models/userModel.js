@@ -1,58 +1,78 @@
-const crypto = require('crypto');
-const mongoose = require('mongoose');
-const validator = require('validator');
-const bcrypt = require('bcryptjs');
+const crypto = require("crypto");
+const mongoose = require("mongoose");
+const validator = require("validator");
+const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Please provide your name'],
-    maxLength: [35, 'A users name must have fewer than 35 characters'],
+    required: [true, "Please provide your name"],
+    maxLength: [35, "A users name must have fewer than 35 characters"],
   },
   email: {
     type: String,
-    required: [true, 'Please provide an an email'],
-    unique: [true, 'Please provide a unique email'],
+    required: [true, "Please provide an an email"],
+    unique: [true, "Please provide a unique email"],
     lowercase: true,
-    validate: [validator.isEmail, 'Please provide an email'],
+    validate: [validator.isEmail, "Please provide an email"],
   },
   photo: String,
   role: {
     type: String,
-    enum: ['user', 'guide', 'lead-guide', 'admin'],
-    default: 'user',
+    enum: ["user", "guide", "lead-guide", "admin"],
+    default: "user",
   },
   password: {
     type: String,
     minlength: 8,
-    maxlength: [15, 'Password can be no longer than 15 characters'],
-    required: [true, 'Please provide a password'],
+    maxlength: [15, "Password can be no longer than 15 characters"],
+    required: [true, "Please provide a password"],
     select: false,
   },
   passwordConfirm: {
     type: String,
-    required: [true, 'You must confirm your password'],
+    required: [true, "You must confirm your password"],
     validate: {
       validator: function (el) {
         return el === this.password; // this returns true if the two match -- ONLY WORKS ON CREAT AND SAVE!!!
         // IMPORTANT --> this will not validate correctly on a PW update
       },
-      message: 'Passwords do not match.',
+      message: "Passwords do not match.",
     },
   },
   passwordChangedAt: Date,
   passwordResetToken: String,
   passwordResetExpires: Date,
+  active: {
+    type: Boolean,
+    default: true,
+    select: false,
+  },
 });
 
 // Encrypting sensitive information before it's saved to the database
-userSchema.pre('save', async function (next) {
+userSchema.pre("save", async function (next) {
   //   only run this function if the PW was actually modified
-  if (!this.isModified('password')) return next();
+  if (!this.isModified("password")) return next();
   // hashing PW before it gets saved (also using bcript)
   this.password = await bcrypt.hash(this.password, 12);
   // Remmove the confirmPassword field
   this.passwordConfirm = undefined;
+  next();
+});
+
+userSchema.pre("save", function (next) {
+  // If the PW was changed or the document is new --> exit
+  if (!this.isModified("password") || this.isNew) return next();
+
+  this.passwordChangedAt = Date.now() - 1000;
+  next();
+});
+
+// Does NOT display any users taht are set as innactive for a GET request
+userSchema.pre(/^find/, function (next) {
+  // this points to the current query
+  this.find({ active: { $ne: false } });
   next();
 });
 
@@ -79,13 +99,13 @@ userSchema.methods.changedPasswordAfter = function (jwtTimestamp) {
 
 userSchema.methods.createPasswordResetToken = function () {
   // Create reset token using crypto package
-  const resetToken = crypto.randomBytes(32).toString('hex');
+  const resetToken = crypto.randomBytes(32).toString("hex");
 
   // Setting the PW reset token
   this.passwordResetToken = crypto
-    .createHash('sha256')
+    .createHash("sha256")
     .update(resetToken)
-    .digest('hex');
+    .digest("hex");
 
   console.log({ resetToken }, this.passwordResetToken);
   // Setting the expiration timeframe
@@ -94,6 +114,6 @@ userSchema.methods.createPasswordResetToken = function () {
   return resetToken;
 };
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model("User", userSchema);
 
 module.exports = User;
